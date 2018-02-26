@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.content.Context;
 import android.location.Location;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.RecyclerView;
@@ -38,7 +41,9 @@ public class ISSFragment extends Fragment implements IISSView , ILocationChanged
     private Vector<PassTime> mRecyclerItemList = new Vector<>();
     GPSManager mGpsTracker;
     ISSPresenterImp preseterimpl;
+    Handler mHandler;
     Activity activity ;
+    private static final int NOTIFY_DATACHNAGE = 1;
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -46,6 +51,29 @@ public class ISSFragment extends Fragment implements IISSView , ILocationChanged
         preseterimpl = new ISSPresenterImp(this);
         GPSManager.registerListner(this);
         GPSService.registerListner(this);
+        mHandler = new Handler(Looper.getMainLooper() ){
+            @Override
+            public void handleMessage(Message msg) {
+                super.handleMessage(msg);
+                switch (msg.what) {
+                    case NOTIFY_DATACHNAGE:
+                        SpaceStationData spaceStationData = (SpaceStationData)msg.obj;
+                        latlong.setText(spaceStationData.getRequest().getLatitude() + "," + spaceStationData.getRequest().getLongitude() + "Alt:" + spaceStationData.getRequest().getAltitude());
+                        datetime.setText(ISSUtils.getInstance().convertLong2Date(spaceStationData.getRequest().getDatetime()));
+                        if (spaceStationData.getResponse() != null && spaceStationData.getResponse() .length > 0) {
+                            mRecyclerItemList.clear();
+
+                            for (PassTime aPassTime : spaceStationData.getResponse()) {
+                                mRecyclerItemList.add(aPassTime);
+                            }
+                            if (mRecyclerItemList.size() > 0) {
+                                mIssAdapter.updateAdapterList(mRecyclerItemList);
+                            }
+                        }
+                        break;
+                }
+            }
+        };
     }
 
     public static final String EXTRA_ISS_DURATION = "EXTRA_ISS_DURATION";
@@ -89,7 +117,10 @@ public class ISSFragment extends Fragment implements IISSView , ILocationChanged
 
     @Override
     public void notifyDataChange(final Vector<SpaceStationData> spaceStationData) {
-        getActivity().runOnUiThread(new Thread(new Runnable() {
+
+        Message completeMessage = mHandler.obtainMessage(NOTIFY_DATACHNAGE, spaceStationData.get(0));
+        completeMessage.sendToTarget();
+       /* getActivity().runOnUiThread(new Thread(new Runnable() {
             @Override
             public void run() {
                 latlong.setText(spaceStationData.get(0).getRequest().getLatitude() + "," + spaceStationData.get(0).getRequest().getLongitude() + "Alt:" + spaceStationData.get(0).getRequest().getAltitude());
@@ -106,7 +137,7 @@ public class ISSFragment extends Fragment implements IISSView , ILocationChanged
                 }
             }
 
-        }));
+        }));*/
     }
 
     @Override
